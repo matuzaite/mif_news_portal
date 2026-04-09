@@ -31,12 +31,10 @@ export async function GET(request: Request) {
     const type = searchParams.get('type') || 'naujienos';
     const rssUrl = type === 'renginiai'
         ? 'https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos/renginiai?format=feed&type=rss'
-        : 'https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos?format=feed&type=rss';
-
-    try {
+        : 'https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos?format=feed&type=rss';    try {
         const response = await fetch(rssUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
-            next: { revalidate: 60 }
+            next: { revalidate: 3600 }
         });
         const xml = await response.text();
         const initialItems = [];
@@ -53,7 +51,9 @@ export async function GET(request: Request) {
             const imgMatch = descriptionFull.match(/src="([^"]+\.(?:jpg|png|jpeg|webp))"/i);
             let image = imgMatch ? imgMatch[1] : "";
             if (image && !image.startsWith('http')) {
-                image = `https://mif.vu.lt${image}`;
+                // Ensure no double slashes and fix possible relative path issues
+                image = image.startsWith('/') ? `https://mif.vu.lt${image}` : `https://mif.vu.lt/${image}`;
+                image = image.replace(/([^:])\/\//g, '$1/'); // Prevent double slashes
             }
             if (!image) {
                 image = "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600";
@@ -73,12 +73,15 @@ export async function GET(request: Request) {
             });
         }
 
-        // Fetch full content for the first 8 items
+        // Fetch full content for the first 5 items (optimized from 8)
         const items = await Promise.all(initialItems.map(async (item, index) => {
-            if (index >= 8 || !item.link) return { ...item, description: decodeHtmlEntities(cleanHtml(item.description)) };
+            if (index >= 5 || !item.link) return { ...item, description: decodeHtmlEntities(cleanHtml(item.description)) };
 
             try {
-                const articleRes = await fetch(item.link, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+                const articleRes = await fetch(item.link, { 
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    next: { revalidate: 3600 }
+                });
                 const html = await articleRes.text();
 
                 // Advanced Article Body Selection

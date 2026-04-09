@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import styles from './Sidebar.module.scss';
 
 export default function Sidebar() {
@@ -15,9 +16,12 @@ export default function Sidebar() {
     <aside className={styles.sidebar}>
       {/* Logo */}
       <div className={styles.logoContainer}>
-        <img
+        <Image
           src="/MIF.svg"
           alt="VU MIF Logo"
+          width={150}
+          height={80}
+          priority
         />
       </div>
 

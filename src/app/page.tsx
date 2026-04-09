@@ -1,28 +1,26 @@
 import Sidebar from '@/components/Sidebar/Sidebar';
 import NewsCarousel from '@/components/NewsCarousel/NewsCarousel';
+import styles from './page.module.css';
 
-export default function Home() {
+async function getNews() {
+  const res = await fetch('http://localhost:3000/api/news', {
+    next: { revalidate: 3600 }
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export default async function Home() {
+  const news = await getNews();
+
   return (
-    <main style={{
-      display: 'flex',
-      flexDirection: 'row',
-      height: '100vh',
-      width: '100vw',
-      overflow: 'hidden',
-      background: 'var(--bg-color)',
-    }}>
+    <main className={styles.main}>
       {/* Left burgundy sidebar */}
       <Sidebar />
 
       {/* Right content area - Now full width for news */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        background: 'var(--bg-white)',
-      }}>
-        <NewsCarousel />
+      <div className={styles.contentArea}>
+        <NewsCarousel initialItems={news} />
       </div>
     </main>
   );

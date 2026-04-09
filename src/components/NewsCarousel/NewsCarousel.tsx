@@ -1,58 +1,67 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import styles from './NewsCarousel.module.scss';
 
-export default function NewsCarousel() {
-  const [items, setItems] = useState<any[]>([]);
+interface NewsCarouselProps {
+  initialItems: any[];
+}
+
+export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
+  const [items] = useState<any[]>(initialItems);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollInterval = useRef<NodeJS.Timeout | null>(null);
+  const requestRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number | null>(null);
+  const autoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    fetch('/api/news')
-      .then(res => res.json())
-      .then(data => {
-        setItems(data);
-        setLoading(false);
-      });
-  }, []);
+  const startAutoRotation = useCallback(() => {
+    if (autoRotateTimerRef.current) clearInterval(autoRotateTimerRef.current);
+    autoRotateTimerRef.current = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % items.length);
+    }, 15000);
+  }, [items.length]);
 
-  // Auto-rotation of articles
   useEffect(() => {
     if (items.length === 0) return;
-    const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % items.length);
-    }, 15000); // Rotate every 15 seconds
-    return () => clearInterval(interval);
-  }, [items]);
-
-  // Handle auto-scrolling for long articles
-  useEffect(() => {
-    if (scrollInterval.current) clearInterval(scrollInterval.current);
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-
-    const startScrolling = () => {
-      scrollInterval.current = setInterval(() => {
-        if (scrollRef.current) {
-          const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-          if (scrollTop + clientHeight >= scrollHeight - 2) {
-            clearInterval(scrollInterval.current!);
-          } else {
-            scrollRef.current.scrollTop += 1;
-          }
-        }
-      }, 50);
+    startAutoRotation();
+    return () => {
+      if (autoRotateTimerRef.current) clearInterval(autoRotateTimerRef.current);
     };
+  }, [items.length, startAutoRotation]);
 
-    const delay = setTimeout(startScrolling, 3000);
+  const handleDotClick = (idx: number) => {
+    setCurrentIndex(idx);
+    startAutoRotation(); // Reset timer
+  };
+
+  const animate = useCallback((time: number) => {
+    if (lastTimeRef.current !== null && scrollRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      if (scrollTop + clientHeight < scrollHeight - 1) {
+        // Scroll 20 pixels per second (approx 0.33px per 16.6ms frame)
+        const deltaTime = time - lastTimeRef.current;
+        scrollRef.current.scrollTop += (20 * deltaTime) / 1000;
+      }
+    }
+    lastTimeRef.current = time;
+    requestRef.current = requestAnimationFrame(animate);
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    lastTimeRef.current = null;
+    
+    const delay = setTimeout(() => {
+      requestRef.current = requestAnimationFrame(animate);
+    }, 3000);
+
     return () => {
       clearTimeout(delay);
-      if (scrollInterval.current) clearInterval(scrollInterval.current);
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [currentIndex, items]);
+  }, [currentIndex, animate]);
 
-  if (loading) return <div className={styles.loading}>Kraunamos naujienos...</div>;
   if (items.length === 0) return <div className={styles.loading}>Naujienų nerasta</div>;
 
   const current = items[currentIndex];
@@ -66,15 +75,27 @@ export default function NewsCarousel() {
       <div className={styles.newsContainer}>
         {/* Left Column: Image and Headline */}
         <div className={styles.leftColumn}>
-          <div 
-            className={styles.backgroundImage} 
-            style={{ backgroundImage: `url(${current.image})` }} 
-          />
-          <img
-            src={current.image}
-            alt={current.title}
-            className={styles.mainImage}
-          />
+          <div className={styles.backgroundImageContainer}>
+            <Image
+              src={current.image}
+              alt=""
+              fill
+              className={styles.backgroundImageBlur}
+              unoptimized={current.image.includes('images.unsplash.com')}
+            />
+          </div>
+          
+          <div className={styles.imageWrapper}>
+            <Image
+              src={current.image}
+              alt={current.title}
+              fill
+              className={styles.mainImage}
+              priority={currentIndex === 0}
+              unoptimized={current.image.includes('images.unsplash.com')}
+            />
+          </div>
+          
           <div className={styles.imageOverlay} />
           
           <div className={styles.headlineContainer}>
@@ -86,7 +107,7 @@ export default function NewsCarousel() {
             {items.map((_, idx) => (
               <button
                 key={idx}
-                onClick={() => setCurrentIndex(idx)}
+                onClick={() => handleDotClick(idx)}
                 className={`${styles.dot} ${idx === currentIndex ? styles.activeDot : styles.inactiveDot}`}
               />
             ))}
