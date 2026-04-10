@@ -51,7 +51,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     lastTimeRef.current = null;
-    
+
     const delay = setTimeout(() => {
       requestRef.current = requestAnimationFrame(animate);
     }, 3000);
@@ -66,7 +66,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
 
   const current = items[currentIndex];
   // Split description into paragraphs by \n\n
-  const paragraphs: string[] = current.description 
+  const paragraphs: string[] = current.description
     ? current.description.split('\n\n').filter((p: string) => p.trim().length > 0)
     : [];
 
@@ -81,23 +81,27 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
               alt=""
               fill
               className={styles.backgroundImageBlur}
+              preload={currentIndex === 0}
               unoptimized={current.image.includes('images.unsplash.com')}
+              sizes="(max-width: 1200px) 65vw, 35vw"
             />
           </div>
-          
+
           <div className={styles.imageWrapper}>
             <Image
               src={current.image}
               alt={current.title}
               fill
               className={styles.mainImage}
-              priority={currentIndex === 0}
+              loading={currentIndex === 0 ? "eager" : "lazy"}
+              preload={currentIndex === 0}
               unoptimized={current.image.includes('images.unsplash.com')}
+              sizes="(max-width: 1200px) 60vw, 32vw"
             />
           </div>
-          
+
           <div className={styles.imageOverlay} />
-          
+
           <div className={styles.headlineContainer}>
             <h2 className={styles.headline}>{current.title}</h2>
           </div>
@@ -119,7 +123,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
           <div className={styles.dateLabel}>
             {current.date}
           </div>
-          
+
           <div ref={scrollRef} className={styles.articleBody}>
             {paragraphs.map((p: string, idx: number) => (
               <p

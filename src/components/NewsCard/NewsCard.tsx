@@ -12,6 +12,7 @@ export default function NewsCard({ item }: { item: any }) {
             fill
             className={styles.blur}
             unoptimized={item.image.includes('images.unsplash.com')}
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           />
         </div>
         <Image
@@ -20,6 +21,7 @@ export default function NewsCard({ item }: { item: any }) {
           fill
           className={styles.mainImage}
           unoptimized={item.image.includes('images.unsplash.com')}
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
       </div>
       <div className={styles.content}>

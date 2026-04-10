@@ -21,7 +21,7 @@ export default function Sidebar() {
           alt="VU MIF Logo"
           width={150}
           height={80}
-          priority
+          preload
         />
       </div>
 

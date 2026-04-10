@@ -44,16 +44,19 @@
 
 .imageWrapper {
   position: relative;
-  width: 85%;
-  height: 80%;
+  width: 65%;
+  height: 61%;
+  aspect-ratio: 16 / 9;
+  height: auto;
   z-index: 2;
-  border-radius: 20px;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.5);
 }
 
 .mainImage {
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .imageOverlay {
@@ -62,7 +65,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to bottom, transparent 60%, rgba(0,0,0,0.4) 100%);
+  background: linear-gradient(to bottom, transparent 60%, rgba(0, 0, 0, 0.4) 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -81,7 +84,7 @@
   font-weight: 700;
   color: white;
   margin: 0;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .rightColumn {
@@ -105,6 +108,7 @@
   flex: 1;
   overflow-y: auto;
   scrollbar-width: none;
+
   &::-webkit-scrollbar {
     display: none;
   }
@@ -137,7 +141,7 @@
   transition: all 0.3s ease;
   cursor: pointer;
   border: none;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .activeDot {
@@ -147,7 +151,7 @@
 
 .inactiveDot {
   &:hover {
-    background: rgba(255,255,255,0.4);
+    background: rgba(255, 255, 255, 0.4);
   }
 }
 
