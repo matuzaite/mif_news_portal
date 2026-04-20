@@ -1,0 +1,20 @@
+{
+  "feeds": {
+    "naujienos": "https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos?format=feed&type=rss",
+    "renginiai": "https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos/renginiai?format=feed&type=rss"
+  },
+  "scraping": {
+    "selectors": [
+      "div[itemprop='articleBody']",
+      "section[itemprop='articleBody']",
+      "div.item-page"
+    ],
+    "maxItems": 10,
+    "maxDetailedItems": 5,
+    "revalidate": 3600
+  },
+  "ui": {
+    "title": "VU MIF Naujienų Portalas",
+    "placeholderImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600"
+  }
+}

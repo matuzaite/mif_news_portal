@@ -75,18 +75,6 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
       <div className={styles.newsContainer}>
         {/* Left Column: Image and Headline */}
         <div className={styles.leftColumn}>
-          <div className={styles.backgroundImageContainer}>
-            <Image
-              src={current.image}
-              alt=""
-              fill
-              className={styles.backgroundImageBlur}
-              preload={currentIndex === 0}
-              unoptimized={current.image.includes('images.unsplash.com')}
-              sizes="(max-width: 1200px) 65vw, 35vw"
-            />
-          </div>
-
           <div className={styles.imageWrapper}>
             <Image
               src={current.image}
@@ -96,11 +84,9 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
               loading={currentIndex === 0 ? "eager" : "lazy"}
               preload={currentIndex === 0}
               unoptimized={current.image.includes('images.unsplash.com')}
-              sizes="(max-width: 1200px) 60vw, 32vw"
+              sizes="(max-width: 1200px) 70vw, 40vw"
             />
           </div>
-
-          <div className={styles.imageOverlay} />
 
           <div className={styles.headlineContainer}>
             <h2 className={styles.headline}>{current.title}</h2>
@@ -128,7 +114,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
             {paragraphs.map((p: string, idx: number) => (
               <p
                 key={idx}
-                className={`${styles.paragraph} ${idx === 0 ? styles.lead : styles.normal}`}
+                className={`${styles.paragraph} ${idx === 0 && paragraphs.length > 1 ? styles.lead : styles.normal}`}
               >
                 {p}
               </p>

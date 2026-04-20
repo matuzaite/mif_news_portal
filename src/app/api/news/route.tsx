@@ -1,81 +1,84 @@
 import { NextResponse } from 'next/server';
+import config from '@/config/portal.config.json';
+import { parse } from 'node-html-parser';
 
-// Helper to decode HTML entities like &nbsp;
-function decodeHtmlEntities(text: string): string {
-    return text
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&#160;/g, ' ')
-        .replace(/&quot;/g, '"')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&bdquo;/g, '"')
-        .replace(/&ldquo;/g, '"')
-        .replace(/&rdquo;/g, '"')
-        .replace(/&ndash;/g, '–')
-        .replace(/&hellip;/g, '...');
+// Helper to decode HTML entities and clean text
+function getText(html: string): string {
+    if (!html) return "";
+    const root = parse(html);
+    return root.structuredText.trim();
 }
 
 // Helper to strip tags AND their contents for specific tags like style/script
-function cleanHtml(html: string): string {
+function cleanBodyHtml(html: string): string {
     if (!html) return "";
-    return html
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tag AND its content
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove script tag AND its content
-        .replace(/<[^>]*>/g, '') // Remove all other tags
-        .trim();
+    const root = parse(html);
+    
+    // Remove scripts and styles
+    root.querySelectorAll('script, style').forEach(el => el.remove());
+    
+    return root.toString();
 }
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'naujienos';
-    const rssUrl = type === 'renginiai'
-        ? 'https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos/renginiai?format=feed&type=rss'
-        : 'https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos?format=feed&type=rss';    try {
+    
+    // Load from config
+    const rssUrl = config.feeds[type as keyof typeof config.feeds] || config.feeds.naujienos;
+
+    try {
         const response = await fetch(rssUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
-            next: { revalidate: 3600 }
+            next: { revalidate: config.scraping.revalidate }
         });
-        const xml = await response.text();
+        const xmlText = await response.text();
+        const root = parse(xmlText, { lowerCaseTagName: true });
+        
+        const items = root.querySelectorAll('item');
         const initialItems = [];
-        const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-        let match;
 
-        while ((match = itemRegex.exec(xml)) !== null && initialItems.length < 10) {
-            const content = match[1];
-            const title = content.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1] || "";
-            const link = content.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/)?.[1] || "";
-            const descriptionFull = content.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/)?.[1] || "";
+        for (let i = 0; i < Math.min(items.length, config.scraping.maxItems); i++) {
+            const item = items[i];
+            const title = item.querySelector('title')?.text || "";
+            const link = item.querySelector('link')?.text || "";
+            const descriptionFull = item.querySelector('description')?.text || "";
 
-            // SVARBU: Ištraukiam nuotrauką
-            const imgMatch = descriptionFull.match(/src="([^"]+\.(?:jpg|png|jpeg|webp))"/i);
-            let image = imgMatch ? imgMatch[1] : "";
+            // Find image
+            const descRoot = parse(descriptionFull);
+            const imgTag = descRoot.querySelector('img');
+            let image = imgTag?.getAttribute('src') || "";
+
             if (image && !image.startsWith('http')) {
-                // Ensure no double slashes and fix possible relative path issues
-                image = image.startsWith('/') ? `https://mif.vu.lt${image}` : `https://mif.vu.lt/${image}`;
-                image = image.replace(/([^:])\/\//g, '$1/'); // Prevent double slashes
+                const baseUrl = 'https://mif.vu.lt';
+                image = image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`;
+                // Simplified double slash fix without regex
+                image = image.replace('://', '@@@').split('//').join('/').replace('@@@', '://');
             }
+            
             if (!image) {
-                image = "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600";
+                image = config.ui.placeholderImage;
             }
 
-            const pubDate = content.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || "";
+            const pubDate = item.querySelector('pubDate')?.text || "";
             const date = pubDate ? new Date(pubDate).toLocaleDateString('lt-LT') : "Šiandien";
 
             initialItems.push({
                 id: Math.random().toString(),
-                title: decodeHtmlEntities(title.trim()),
+                title: getText(title),
                 link: link.trim(),
                 image,
                 date,
                 category: type === 'renginiai' ? 'Renginys' : 'Naujiena',
-                description: descriptionFull // Temporary
+                description: descriptionFull
             });
         }
 
-        // Fetch full content for the first 5 items (optimized from 8)
-        const items = await Promise.all(initialItems.map(async (item, index) => {
-            if (index >= 5 || !item.link) return { ...item, description: decodeHtmlEntities(cleanHtml(item.description)) };
+        // Fetch full content for the first 5 items
+        const results = await Promise.all(initialItems.map(async (item, index) => {
+            if (index >= 5 || !item.link) {
+                return { ...item, description: getText(item.description) };
+            }
 
             try {
                 const articleRes = await fetch(item.link, { 
@@ -83,52 +86,67 @@ export async function GET(request: Request) {
                     next: { revalidate: 3600 }
                 });
                 const html = await articleRes.text();
+                const articleRoot = parse(html);
 
-                // Advanced Article Body Selection
-                const bodyMatch = html.match(/<div itemprop="articleBody">([\s\S]*?)<\/div>/i) 
-                               || html.match(/<section[^>]*itemprop="articleBody">([\s\S]*?)<\/section>/i)
-                               || html.match(/<div class="item-page">([\s\S]*?)<\/div>/i);
+                // Advanced Article Body Selection from Config
+                let bodyHtml = "";
+                for (const selector of config.scraping.selectors) {
+                    // Try class match
+                    const target = articleRoot.querySelector(`.${selector.replace('.', '')}`) 
+                                || articleRoot.querySelector(`[itemprop="articleBody"]`);
+                    
+                    if (target) {
+                        bodyHtml = cleanBodyHtml(target.innerHTML);
+                        break;
+                    }
+                }
                 
-                const bodyHtml = bodyMatch ? bodyMatch[1] : item.description;
+                if (!bodyHtml) bodyHtml = item.description;
 
-                // Ultra-Robust Paragraph Extraction
-                let normalized = bodyHtml.replace(/<(?:div|section|li|h[1-6]|br)[^>]*>/gi, '<p>');
-                const rawChunks = normalized.split(/<p[^>]*>/i);
+                const bodyRoot = parse(bodyHtml);
                 const paragraphs: string[] = [];
                 
-                for (const chunk of rawChunks) {
-                    const cleanText = decodeHtmlEntities(cleanHtml(chunk));
-                    if (cleanText.length > 20) {
-                        paragraphs.push(cleanText);
+                // Select common block elements that might contain text
+                const elements = bodyRoot.querySelectorAll('p, div, li, section, h1, h2, h3, h4, h5, h6');
+                
+                for (const el of elements) {
+                    const text = el.structuredText.trim();
+                    // Skip containers if they have other block-level descendants that we'll catch anyway
+                    const hasBlockChildren = el.querySelector('p, div, li, h1, h2, h3, h4, h5, h6') !== null;
+                    
+                    if (text.length > 20 && !hasBlockChildren && !paragraphs.some(p => p.includes(text))) {
+                        paragraphs.push(text);
                     }
                 }
 
-                if (paragraphs.length === 1 && paragraphs[0].length > 400) {
-                    const singleBlock = paragraphs[0];
-                    const sentences = singleBlock.match(/[^.!?]+[.!?]+(?=\s|$)/g);
-                    if (sentences && sentences.length > 3) {
-                        paragraphs.length = 0;
-                        paragraphs.push(sentences.slice(0, 2).join(' '));
-                        paragraphs.push(sentences.slice(2).join(' '));
-                    }
-                }
-
+                // If no paragraphs found, fallback to full text
                 if (paragraphs.length === 0) {
-                    const plain = decodeHtmlEntities(cleanHtml(bodyHtml));
+                    const plain = getText(bodyHtml);
                     if (plain) paragraphs.push(plain);
+                }
+
+                // Split long single blocks if needed (minimal logic)
+                if (paragraphs.length === 1 && paragraphs[0].length > 400) {
+                    const fullText = paragraphs[0];
+                    const mid = Math.floor(fullText.length / 2);
+                    const splitPos = fullText.indexOf('. ', mid);
+                    if (splitPos !== -1) {
+                        paragraphs[0] = fullText.substring(0, splitPos + 1).trim();
+                        paragraphs.push(fullText.substring(splitPos + 1).trim());
+                    }
                 }
 
                 return {
                     ...item,
-                    description: paragraphs.join('\n\n')
+                    description: paragraphs.slice(0, 10).join('\n\n') // Limit to 10 paragraphs
                 };
             } catch (e) {
-                return { ...item, description: decodeHtmlEntities(cleanHtml(item.description)) };
+                return { ...item, description: getText(item.description) };
             }
         }));
 
-        return NextResponse.json(items);
+        return NextResponse.json(results);
     } catch (error) {
         return NextResponse.json([]);
     }
-}
+}
