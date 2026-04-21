@@ -62,6 +62,15 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
     };
   }, [currentIndex, animate]);
 
+  useEffect(() => {
+    // Hard refresh the entire page every 30 minutes to clear memory and cache
+    const refreshInterval = setInterval(() => {
+      window.location.reload();
+    }, 1000 * 60 * 30); 
+
+    return () => clearInterval(refreshInterval);
+  }, []);
+
   if (items.length === 0) return <div className={styles.loading}>Naujienų nerasta</div>;
 
   const current = items[currentIndex];

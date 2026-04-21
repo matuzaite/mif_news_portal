@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import config from '@/config/portal.config.json';
+export const dynamic = 'force-dynamic';
 import { parse } from 'node-html-parser';
 
 // Helper to decode HTML entities and clean text
@@ -21,16 +22,13 @@ function cleanBodyHtml(html: string): string {
 }
 
 export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type') || 'naujienos';
-    
     // Load from config
-    const rssUrl = config.feeds[type as keyof typeof config.feeds] || config.feeds.naujienos;
+    const rssUrl = config.feeds.naujienos;
 
     try {
         const response = await fetch(rssUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
-            next: { revalidate: config.scraping.revalidate }
+            cache: 'no-store'
         });
         const xmlText = await response.text();
         const root = parse(xmlText, { lowerCaseTagName: true });
@@ -42,7 +40,12 @@ export async function GET(request: Request) {
             const item = items[i];
             const title = item.querySelector('title')?.text || "";
             const link = item.querySelector('link')?.text || "";
-            const descriptionFull = item.querySelector('description')?.text || "";
+            
+            // Extract raw description and handle CDATA manually if the parser leaves it in
+            let descriptionFull = item.querySelector('description')?.innerHTML || "";
+            if (descriptionFull.includes('<![CDATA[')) {
+                descriptionFull = descriptionFull.split('<![CDATA[').join('').split(']]>').join('');
+            }
 
             // Find image
             const descRoot = parse(descriptionFull);
@@ -61,7 +64,7 @@ export async function GET(request: Request) {
             }
 
             const pubDate = item.querySelector('pubDate')?.text || "";
-            const date = pubDate ? new Date(pubDate).toLocaleDateString('lt-LT') : "Šiandien";
+            const date = new Date(pubDate && !isNaN(Date.parse(pubDate)) ? pubDate : Date.now()).toLocaleDateString('lt-LT');
 
             initialItems.push({
                 id: Math.random().toString(),
@@ -69,7 +72,7 @@ export async function GET(request: Request) {
                 link: link.trim(),
                 image,
                 date,
-                category: type === 'renginiai' ? 'Renginys' : 'Naujiena',
+                category: 'Naujiena',
                 description: descriptionFull
             });
         }
@@ -83,7 +86,7 @@ export async function GET(request: Request) {
             try {
                 const articleRes = await fetch(item.link, { 
                     headers: { 'User-Agent': 'Mozilla/5.0' },
-                    next: { revalidate: 3600 }
+                    cache: 'no-store'
                 });
                 const html = await articleRes.text();
                 const articleRoot = parse(html);
