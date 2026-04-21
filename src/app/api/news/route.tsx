@@ -21,6 +21,23 @@ function cleanBodyHtml(html: string): string {
     return root.toString();
 }
 
+// Helper to check if a URL looks like a valid image
+function isImage(url: string): boolean {
+    if (!url || url.length < 5) return false;
+    // Reject URLs that end in a slash (likely directories/pages)
+    if (url.endsWith('/')) return false;
+    
+    const cleanUrl = url.split('?')[0].toLowerCase();
+    return cleanUrl.endsWith('.jpg') || 
+           cleanUrl.endsWith('.jpeg') || 
+           cleanUrl.endsWith('.png') || 
+           cleanUrl.endsWith('.gif') || 
+           cleanUrl.endsWith('.webp') || 
+           cleanUrl.endsWith('.svg') ||
+           url.includes('images.unsplash.com') ||
+           url.includes('data:image/');
+}
+
 export async function GET(request: Request) {
     // Load from config
     const rssUrl = config.feeds.naujienos;
@@ -55,12 +72,14 @@ export async function GET(request: Request) {
             if (image && !image.startsWith('http')) {
                 const baseUrl = 'https://mif.vu.lt';
                 image = image.startsWith('/') ? `${baseUrl}${image}` : `${baseUrl}/${image}`;
-                // Simplified double slash fix without regex
                 image = image.replace('://', '@@@').split('//').join('/').replace('@@@', '://');
             }
             
-            if (!image) {
+            if (!isImage(image)) {
+                console.log(`[API] Invalid image URL detected, using placeholder: "${image}"`);
                 image = config.ui.placeholderImage;
+            } else {
+                console.log(`[API] Valid image URL: "${image}"`);
             }
 
             const pubDate = item.querySelector('pubDate')?.text || "";
