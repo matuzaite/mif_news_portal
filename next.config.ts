@@ -6,6 +6,18 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: '**.mif.vu.lt',
+      },
+      {
+        protocol: 'https',
+        hostname: 'mif.vu.lt',
+      },
+      {
+        protocol: 'http',
+        hostname: '**.mif.vu.lt',
+      },
+      {
+        protocol: 'http',
         hostname: 'mif.vu.lt',
       },
       {

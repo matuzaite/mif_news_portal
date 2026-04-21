@@ -1,17 +1,10 @@
 import Sidebar from '@/components/Sidebar/Sidebar';
 import NewsCarousel from '@/components/NewsCarousel/NewsCarousel';
 import styles from './page.module.css';
-
-async function getNews() {
-  const res = await fetch('http://localhost:3000/api/news', {
-    next: { revalidate: 60 }
-  });
-  if (!res.ok) return [];
-  return res.json();
-}
+import { fetchNews } from '@/lib/news';
 
 export default async function Home() {
-  const news = await getNews();
+    const news = await fetchNews();
 
   return (
     <main className={styles.main}>

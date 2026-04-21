@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import styles from './NewsCarousel.module.scss';
 
 interface NewsCarouselProps {
@@ -8,7 +9,8 @@ interface NewsCarouselProps {
 }
 
 export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
-  const [items] = useState<any[]>(initialItems);
+  const router = useRouter();
+  const [items, setItems] = useState<any[]>(initialItems);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number | null>(null);
@@ -63,6 +65,33 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   }, [currentIndex, animate]);
 
   useEffect(() => {
+    // Refresh the page data every 10 minutes to get today's news
+    const refreshInterval = setInterval(() => {
+      router.refresh(); 
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(refreshInterval);
+  }, [router]);
+
+  useEffect(() => {
+    // Daily hard reload at 3 AM to clear memory
+    const now = new Date();
+    const night = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + (now.getHours() >= 3 ? 1 : 0),
+      3, 0, 0
+    );
+    const msToNight = night.getTime() - now.getTime();
+
+    const reloadTimeout = setTimeout(() => {
+      window.location.reload();
+    }, msToNight);
+
+    return () => clearTimeout(reloadTimeout);
+  }, []);
+
+  useEffect(() => {
     // Hard refresh the entire page every 30 minutes to clear memory and cache
     const refreshInterval = setInterval(() => {
       window.location.reload();
@@ -91,9 +120,15 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
               fill
               className={styles.mainImage}
               loading={currentIndex === 0 ? "eager" : "lazy"}
-              preload={currentIndex === 0}
+              priority={currentIndex === 0}
               unoptimized={current.image.includes('images.unsplash.com')}
               sizes="(max-width: 1200px) 70vw, 40vw"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                if (target.src !== 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600') {
+                  target.src = 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600';
+                }
+              }}
             />
           </div>
 
