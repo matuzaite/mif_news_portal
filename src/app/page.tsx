@@ -4,7 +4,12 @@ import styles from './page.module.css';
 import { fetchNews } from '@/lib/news';
 
 export default async function Home() {
-    const news = await fetchNews();
+  let news: any[] = [];
+  try {
+    news = await fetchNews();
+  } catch (e) {
+    console.error("Build/Fetch Error:", e);
+  }
 
   return (
     <main className={styles.main}>
