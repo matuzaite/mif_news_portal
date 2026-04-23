@@ -103,7 +103,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   if (items.length === 0) return <div className={styles.loading}>Naujienų nerasta</div>;
 
   const current = items[currentIndex];
-  // Split description into paragraphs by \n\n
+  // Split description into paragraphs by double newlines
   const paragraphs: string[] = current.description
     ? current.description.split('\n\n').filter((p: string) => p.trim().length > 0)
     : [];
@@ -156,12 +156,11 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
 
           <div ref={scrollRef} className={styles.articleBody}>
             {paragraphs.map((p: string, idx: number) => (
-              <p
+              <div
                 key={idx}
                 className={`${styles.paragraph} ${idx === 0 && paragraphs.length > 1 ? styles.lead : styles.normal}`}
-              >
-                {p}
-              </p>
+                dangerouslySetInnerHTML={{ __html: p }}
+              />
             ))}
           </div>
         </div>

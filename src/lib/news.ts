@@ -2,10 +2,41 @@ import config from '@/config/portal.config.json';
 import { parse } from 'node-html-parser';
 
 // Helper to decode HTML entities and clean text
+// Helper to remove unsafe tags and attributes while keeping formatting
+function cleanSafeHtml(html: string): string {
+    if (!html) return "";
+    const root = parse(html);
+    
+    // Remove scripts, styles and other unsafe objects
+    root.querySelectorAll('script, style, iframe, canvas, svg, img').forEach(el => el.remove());
+    
+    // Cleanup all attributes except safe ones
+    root.querySelectorAll('*').forEach(el => {
+        const attributes = Object.keys(el.attributes);
+        attributes.forEach(attr => {
+            // Keep href for links and nothing else for now
+            if (attr !== 'href') el.removeAttribute(attr);
+        });
+    });
+    
+    return root.innerHTML.trim();
+}
+
+// Helper to decode HTML entities and preserve paragraph breaks + safe formatting
 function getText(html: string): string {
     if (!html) return "";
     const root = parse(html);
-    return root.structuredText.trim();
+    
+    // Hard breaks: between P tags, headers, or separate lists
+    const blocks = root.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol');
+    if (blocks.length > 0) {
+        return blocks
+            .map(el => cleanSafeHtml(el.innerHTML))
+            .filter(t => t.length > 5) // Ignore very short fragments
+            .join('\n\n');
+    }
+    
+    return cleanSafeHtml(html);
 }
 
 // Helper to strip tags AND their contents for specific tags like style/script
@@ -87,7 +118,8 @@ export async function fetchNews() {
 
         // Fetch full content for the first 5 items using allSettled for reliability
         const resultsRaw = await Promise.allSettled(initialItems.map(async (item, index) => {
-            if (index >= 5 || !item.link) {
+            // For items beyond config.scraping.maxDetailedItems, or if link is missing, just use cleaned RSS description
+            if (index >= config.scraping.maxDetailedItems || !item.link) {
                 return { ...item, description: getText(item.description) };
             }
 
@@ -102,54 +134,18 @@ export async function fetchNews() {
                 // Advanced Article Body Selection from Config
                 let bodyHtml = "";
                 for (const selector of config.scraping.selectors) {
-                    // Try class match
-                    const target = articleRoot.querySelector(`.${selector.replace('.', '')}`) 
-                                || articleRoot.querySelector(`[itemprop="articleBody"]`);
-                    
+                    const target = articleRoot.querySelector(selector);
                     if (target) {
                         bodyHtml = cleanBodyHtml(target.innerHTML);
                         break;
                     }
                 }
                 
-                if (!bodyHtml) bodyHtml = item.description;
-
-                const bodyRoot = parse(bodyHtml);
-                const paragraphs: string[] = [];
-                
-                // Select common block elements that might contain text
-                const elements = bodyRoot.querySelectorAll('p, div, li, section, h1, h2, h3, h4, h5, h6');
-                
-                for (const el of elements) {
-                    const text = el.structuredText.trim();
-                    // Skip containers if they have other block-level descendants that we'll catch anyway
-                    const hasBlockChildren = el.querySelector('p, div, li, h1, h2, h3, h4, h5, h6') !== null;
-                    
-                    if (text.length > 20 && !hasBlockChildren && !paragraphs.some(p => p.includes(text))) {
-                        paragraphs.push(text);
-                    }
-                }
-
-                // If no paragraphs found, fallback to full text
-                if (paragraphs.length === 0) {
-                    const plain = getText(bodyHtml);
-                    if (plain) paragraphs.push(plain);
-                }
-
-                // Split long single blocks if needed (minimal logic)
-                if (paragraphs.length === 1 && paragraphs[0].length > 400) {
-                    const fullText = paragraphs[0];
-                    const mid = Math.floor(fullText.length / 2);
-                    const splitPos = fullText.indexOf('. ', mid);
-                    if (splitPos !== -1) {
-                        paragraphs[0] = fullText.substring(0, splitPos + 1).trim();
-                        paragraphs.push(fullText.substring(splitPos + 1).trim());
-                    }
-                }
+                if (!bodyHtml) return { ...item, description: getText(item.description) };
 
                 return {
                     ...item,
-                    description: paragraphs.slice(0, 10).join('\n\n') // Limit to 10 paragraphs
+                    description: getText(bodyHtml) // Use our improved getText which now handles blocks
                 };
             } catch (e) {
                 return { ...item, description: getText(item.description) };

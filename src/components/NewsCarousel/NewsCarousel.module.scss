@@ -91,6 +91,7 @@
   flex: 1;
   overflow-y: auto;
   scrollbar-width: none;
+  white-space: pre-line; // Preserve line breaks
 
   &::-webkit-scrollbar {
     display: none;
@@ -98,14 +99,18 @@
 }
 
 .paragraph {
+  display: block;
   font-size: 1.35rem;
   line-height: 1.6;
   color: var(--text-primary);
-  margin-bottom: 2rem;
+  margin-bottom: 1.6rem !important; // Balanced spacing between items
+  text-align: justify; // Take full width
 }
 
 .lead {
   font-weight: 700;
+  margin-bottom: 2.5rem;
+  font-size: 1.45rem;
 }
 
 .progressContainer {
