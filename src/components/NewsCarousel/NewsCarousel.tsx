@@ -12,6 +12,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   const router = useRouter();
   const [items, setItems] = useState<any[]>(initialItems);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
@@ -38,17 +39,17 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   };
 
   const animate = useCallback((time: number) => {
-    if (lastTimeRef.current !== null && scrollRef.current) {
+    if (lastTimeRef.current !== null && scrollRef.current && !isPaused) {
       const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
       if (scrollTop + clientHeight < scrollHeight - 1) {
-        // Scroll 20 pixels per second (approx 0.33px per 16.6ms frame)
+        // Scroll 15 pixels per second for a more natural reading pace
         const deltaTime = time - lastTimeRef.current;
-        scrollRef.current.scrollTop += (20 * deltaTime) / 1000;
+        scrollRef.current.scrollTop += (15 * deltaTime) / 1000;
       }
     }
     lastTimeRef.current = time;
     requestRef.current = requestAnimationFrame(animate);
-  }, []);
+  }, [isPaused]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -154,7 +155,12 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
             {current.date}
           </div>
 
-          <div ref={scrollRef} className={styles.articleBody}>
+          <div 
+            ref={scrollRef} 
+            className={styles.articleBody}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+          >
             {paragraphs.map((p: string, idx: number) => (
               <div
                 key={idx}
