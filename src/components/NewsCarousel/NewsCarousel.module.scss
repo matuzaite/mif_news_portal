@@ -74,7 +74,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 60px;
+  padding: 60px 60px 0 60px; // Remove bottom padding to let text reach bottom
   overflow: hidden;
 }
 
@@ -89,9 +89,12 @@
 
 .articleBody {
   flex: 1;
-  overflow-y: auto;
+  // Removed fixed height to fill available space
+  overflow-y: scroll; // Explicitly set to scroll for TV browsers
+  -webkit-overflow-scrolling: touch; // Momentum scrolling support
   scrollbar-width: none;
   white-space: pre-line; // Preserve line breaks
+  outline: none; // Remove the default focus ring (black frame)
 
   &::-webkit-scrollbar {
     display: none;
@@ -103,7 +106,7 @@
   font-size: 1.2rem;
   line-height: 1.6;
   color: var(--text-primary);
-  margin-bottom: 1.6rem !important; // Balanced spacing between items
+  margin-bottom: 3rem !important; // Increased spacing between news items/paragraphs
   text-align: justify; // Take full width
 }
 

@@ -14,15 +14,13 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const requestRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number | null>(null);
   const autoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const startAutoRotation = useCallback(() => {
     if (autoRotateTimerRef.current) clearInterval(autoRotateTimerRef.current);
     autoRotateTimerRef.current = setInterval(() => {
       setCurrentIndex(prev => (prev + 1) % items.length);
-    }, 15000);
+    }, 25000); // Increased interval to 25 seconds
   }, [items.length]);
 
   useEffect(() => {
@@ -38,32 +36,36 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
     startAutoRotation(); // Reset timer
   };
 
-  const animate = useCallback((time: number) => {
-    if (lastTimeRef.current !== null && scrollRef.current && !isPaused) {
-      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-      if (scrollTop + clientHeight < scrollHeight - 1) {
-        // Scroll 15 pixels per second for a more natural reading pace
-        const deltaTime = time - lastTimeRef.current;
-        scrollRef.current.scrollTop += (15 * deltaTime) / 1000;
-      }
-    }
-    lastTimeRef.current = time;
-    requestRef.current = requestAnimationFrame(animate);
-  }, [isPaused]);
+  const scrollPosRef = useRef(0);
+  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
-    lastTimeRef.current = null;
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+      scrollPosRef.current = 0;
+    }
+
+    if (scrollIntervalRef.current) clearInterval(scrollIntervalRef.current);
 
     const delay = setTimeout(() => {
-      requestRef.current = requestAnimationFrame(animate);
-    }, 3000);
+      scrollIntervalRef.current = setInterval(() => {
+        if (scrollRef.current && !isPaused) {
+          const { scrollHeight, clientHeight } = scrollRef.current;
+          
+          if (scrollPosRef.current + clientHeight < scrollHeight - 2) {
+            // 20px per second / 30fps = 0.6px per tick
+            scrollPosRef.current += 0.6; 
+            scrollRef.current.scrollTop = Math.floor(scrollPosRef.current);
+          }
+        }
+      }, 30); // ~33fps for stability
+    }, 2000);
 
     return () => {
       clearTimeout(delay);
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      if (scrollIntervalRef.current) clearInterval(scrollIntervalRef.current);
     };
-  }, [currentIndex, animate]);
+  }, [currentIndex, isPaused]);
 
   useEffect(() => {
     // Refresh the page data every 10 minutes to get today's news
@@ -160,6 +162,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
             className={styles.articleBody}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
+            tabIndex={0}
           >
             {paragraphs.map((p: string, idx: number) => (
               <div
