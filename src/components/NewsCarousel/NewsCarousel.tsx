@@ -16,6 +16,11 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  useEffect(() => {
+    setItems(initialItems);
+    setCurrentIndex(0); 
+  }, [initialItems]);
+
   const startAutoRotation = useCallback(() => {
     if (autoRotateTimerRef.current) clearInterval(autoRotateTimerRef.current);
     autoRotateTimerRef.current = setInterval(() => {
@@ -68,15 +73,6 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   }, [currentIndex, isPaused]);
 
   useEffect(() => {
-    // Refresh the page data every 10 minutes to get today's news
-    const refreshInterval = setInterval(() => {
-      router.refresh(); 
-    }, 10 * 60 * 1000);
-
-    return () => clearInterval(refreshInterval);
-  }, [router]);
-
-  useEffect(() => {
     // Daily hard reload at 3 AM to clear memory
     const now = new Date();
     const night = new Date(
@@ -92,15 +88,6 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
     }, msToNight);
 
     return () => clearTimeout(reloadTimeout);
-  }, []);
-
-  useEffect(() => {
-    // Hard refresh the entire page every 30 minutes to clear memory and cache
-    const refreshInterval = setInterval(() => {
-      window.location.reload();
-    }, 1000 * 60 * 30); 
-
-    return () => clearInterval(refreshInterval);
   }, []);
 
   if (items.length === 0) return <div className={styles.loading}>Naujienų nerasta</div>;
