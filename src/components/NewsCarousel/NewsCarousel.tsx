@@ -19,10 +19,8 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   useEffect(() => {
     const fetchLatestNews = async () => {
       try {
-        // ?t= prideda unikalų laiką, todėl naršyklė NIEKADA nepanaudos seno cache
-        const res = await fetch(`/api/news?t=${new Date().getTime()}`, {
-          cache: 'no-store'
-        });
+        // Naudojame ir laiką, ir Math.random(), nes TV vidiniai laikrodžiai dažnai būna "užšalę"
+        const res = await fetch(`/api/news?t=${new Date().getTime()}&r=${Math.random()}`);
         
         const freshData = await res.json();
         
@@ -193,6 +191,10 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
             />
           ))}
         </div>
+      </div>
+      {/* Debug Indicator - subtle version and count to verify cache */}
+      <div style={{ position: 'absolute', bottom: 5, right: 10, fontSize: '10px', color: 'rgba(0,0,0,0.3)', zIndex: 100 }}>
+        v2 | Kiekis: {items.length} | {new Date().toLocaleTimeString()}
       </div>
     </div>
   );
