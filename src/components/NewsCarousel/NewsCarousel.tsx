@@ -17,9 +17,34 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
   const autoRotateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    setItems(initialItems);
-    setCurrentIndex(0); 
-  }, [initialItems]);
+    const fetchLatestNews = async () => {
+      try {
+        // ?t= prideda unikalų laiką, todėl naršyklė NIEKADA nepanaudos seno cache
+        const res = await fetch(`/api/news?t=${new Date().getTime()}`, {
+          cache: 'no-store'
+        });
+        
+        const freshData = await res.json();
+        
+        // Jei gavome naujienų, pakeičiame karuselės duomenis
+        if (freshData && freshData.length > 0) {
+          setItems(freshData);
+          // Apsauga: jei buvome 5 slaide, o naujienų liko tik 4, grįžtame į pradžią
+          setCurrentIndex((prev) => (prev >= freshData.length ? 0 : prev));
+        }
+      } catch (error) {
+        console.error("Klaida gaunant šviežias naujienas:", error);
+      }
+    };
+
+    // Iškviečiame funkciją iškart, kai tik komponentas atsiranda ekrane
+    fetchLatestNews();
+
+    // Automatiškai ir tyliai fone ieškome naujų žinių kas 30 minučių (1800000 ms)
+    const updateInterval = setInterval(fetchLatestNews, 1800000);
+    
+    return () => clearInterval(updateInterval);
+  }, []);
 
   const startAutoRotation = useCallback(() => {
     if (autoRotateTimerRef.current) clearInterval(autoRotateTimerRef.current);
