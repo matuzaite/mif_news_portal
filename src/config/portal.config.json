@@ -1,6 +1,6 @@
 {
   "feeds": {
-    "naujienos": "https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos?format=feed&type=rss"
+    "naujienos": "https://mif.vu.lt/lt3/kas-vyksta-fakultete/naujienos/fakulteto-naujienos?format=feed&type=rss"
   },
   "scraping": {
     "selectors": [
