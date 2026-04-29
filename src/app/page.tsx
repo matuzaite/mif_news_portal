@@ -1,16 +1,20 @@
 import Sidebar from '@/components/Sidebar/Sidebar';
 import NewsCarousel from '@/components/NewsCarousel/NewsCarousel';
 import styles from './page.module.css';
-import { fetchNews } from '@/lib/news';
 
+// 1. IMPORTUOJAME TIESIOGIAI IŠ LIB FAILO
+import { fetchNews } from '@/lib/news'; 
+
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function Home() {
   let news: any[] = [];
   try {
-    news = await fetchNews();
+    // 2. KVIEČIAME FUNKCIJĄ TIESIOGIAI (Jokio fetch į localhost!)
+    news = await fetchNews(); 
   } catch (e) {
-    console.error("Build/Fetch Error:", e);
+    console.error("Duomenų gavimo klaida:", e);
   }
 
   return (
