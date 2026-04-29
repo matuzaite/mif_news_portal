@@ -105,73 +105,81 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
 
   if (items.length === 0) return <div className={styles.loading}>Naujienų nerasta</div>;
 
-  const current = items[currentIndex];
-  // Split description into paragraphs by double newlines
-  const paragraphs: string[] = current.description
-    ? current.description.split('\n\n').filter((p: string) => p.trim().length > 0)
-    : [];
-
   return (
     <div className={styles.carouselWrapper}>
       <div className={styles.newsContainer}>
-        {/* Left Column: Image and Headline */}
-        <div className={styles.leftColumn}>
-          <div className={styles.imageWrapper}>
-            <Image
-              src={current.image}
-              alt={current.title}
-              fill
-              className={styles.mainImage}
-              loading={currentIndex === 0 ? "eager" : "lazy"}
-              priority={currentIndex === 0}
-              unoptimized={current.image.includes('images.unsplash.com')}
-              sizes="(max-width: 1200px) 70vw, 40vw"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                if (target.src !== 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600') {
-                  target.src = 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600';
-                }
-              }}
+        {items.map((item, idx) => {
+          const isActive = idx === currentIndex;
+          const paragraphs: string[] = item.description
+            ? item.description.split('\n\n').filter((p: string) => p.trim().length > 0)
+            : [];
+
+          return (
+            <div 
+              key={idx} 
+              className={`${styles.slide} ${isActive ? styles.activeSlide : styles.inactiveSlide}`}
+            >
+              {/* Left Column: Image and Headline */}
+              <div className={styles.leftColumn}>
+                <div className={styles.imageWrapper}>
+                  <Image
+                    src={item.image}
+                    alt={item.title}
+                    fill
+                    className={styles.mainImage}
+                    loading={idx === 0 ? "eager" : "lazy"}
+                    priority={idx === 0}
+                    unoptimized={item.image.includes('images.unsplash.com')}
+                    sizes="(max-width: 1200px) 70vw, 40vw"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (target.src !== 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600') {
+                        target.src = 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600';
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className={styles.headlineContainer}>
+                  <h2 className={styles.headline}>{item.title}</h2>
+                </div>
+              </div>
+
+              {/* Right Column: Date and Clean Paragraphs */}
+              <div className={styles.rightColumn}>
+                <div className={styles.dateLabel}>
+                  {item.date}
+                </div>
+
+                <div 
+                  ref={isActive ? scrollRef : null} 
+                  className={styles.articleBody}
+                  onMouseEnter={() => setIsPaused(true)}
+                  onMouseLeave={() => setIsPaused(false)}
+                  tabIndex={0}
+                >
+                  {paragraphs.map((p: string, pIdx: number) => (
+                    <div
+                      key={pIdx}
+                      className={`${styles.paragraph} ${pIdx === 0 && paragraphs.length > 1 ? styles.lead : styles.normal}`}
+                      dangerouslySetInnerHTML={{ __html: p }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Progress dots */}
+        <div className={styles.progressContainer}>
+          {items.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleDotClick(idx)}
+              className={`${styles.dot} ${idx === currentIndex ? styles.activeDot : styles.inactiveDot}`}
             />
-          </div>
-
-          <div className={styles.headlineContainer}>
-            <h2 className={styles.headline}>{current.title}</h2>
-          </div>
-
-          {/* Progress dots on top of image */}
-          <div className={styles.progressContainer}>
-            {items.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleDotClick(idx)}
-                className={`${styles.dot} ${idx === currentIndex ? styles.activeDot : styles.inactiveDot}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Right Column: Date and Clean Paragraphs */}
-        <div className={styles.rightColumn}>
-          <div className={styles.dateLabel}>
-            {current.date}
-          </div>
-
-          <div 
-            ref={scrollRef} 
-            className={styles.articleBody}
-            onMouseEnter={() => setIsPaused(true)}
-            onMouseLeave={() => setIsPaused(false)}
-            tabIndex={0}
-          >
-            {paragraphs.map((p: string, idx: number) => (
-              <div
-                key={idx}
-                className={`${styles.paragraph} ${idx === 0 && paragraphs.length > 1 ? styles.lead : styles.normal}`}
-                dangerouslySetInnerHTML={{ __html: p }}
-              />
-            ))}
-          </div>
+          ))}
         </div>
       </div>
     </div>
