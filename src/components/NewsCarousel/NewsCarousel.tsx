@@ -192,10 +192,6 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
           ))}
         </div>
       </div>
-      {/* Debug Indicator - subtle version and count to verify cache */}
-      <div style={{ position: 'absolute', bottom: 5, right: 10, fontSize: '10px', color: 'rgba(0,0,0,0.3)', zIndex: 100 }}>
-        v2 | Kiekis: {items.length} | {new Date().toLocaleTimeString()}
-      </div>
     </div>
   );
 }

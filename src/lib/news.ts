@@ -3,19 +3,41 @@ import { parse } from 'node-html-parser';
 
 // Helper to decode HTML entities and clean text
 // Helper to remove unsafe tags and attributes while keeping formatting
-function cleanSafeHtml(html: string): string {
+function cleanSafeHtml(html: string, mainImageUrl?: string): string {
     if (!html) return "";
     const root = parse(html);
     
     // Remove scripts, styles and other unsafe objects
-    root.querySelectorAll('script, style, iframe, canvas, svg, img').forEach(el => el.remove());
+    root.querySelectorAll('script, style, iframe, canvas, svg').forEach(el => el.remove());
     
     // Cleanup all attributes except safe ones
     root.querySelectorAll('*').forEach(el => {
+        if (el.tagName.toLowerCase() === 'img') {
+            const src = el.getAttribute('src');
+            if (src) {
+                try {
+                    const absoluteUrl = new URL(src, 'https://mif.vu.lt').href;
+                    if (absoluteUrl === mainImageUrl) {
+                        el.remove();
+                        return; // skip further processing for this element
+                    } else {
+                        el.setAttribute('src', absoluteUrl);
+                    }
+                } catch (e) {
+                    el.remove();
+                    return;
+                }
+            } else {
+                el.remove();
+                return;
+            }
+        }
+
         const attributes = Object.keys(el.attributes);
         attributes.forEach(attr => {
-            // Keep href for links and nothing else for now
-            if (attr !== 'href') el.removeAttribute(attr);
+            // Keep href for links, src/alt/width/height for images
+            const safeAttrs = ['href', 'src', 'alt', 'width', 'height'];
+            if (!safeAttrs.includes(attr)) el.removeAttribute(attr);
         });
     });
     
@@ -23,7 +45,7 @@ function cleanSafeHtml(html: string): string {
 }
 
 // Helper to decode HTML entities and preserve paragraph breaks + safe formatting
-function getText(html: string): string {
+function getText(html: string, mainImageUrl?: string): string {
     if (!html) return "";
     const root = parse(html);
     
@@ -31,12 +53,12 @@ function getText(html: string): string {
     const blocks = root.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol');
     if (blocks.length > 0) {
         return blocks
-            .map(el => cleanSafeHtml(el.innerHTML))
+            .map(el => cleanSafeHtml(el.innerHTML, mainImageUrl))
             .filter(t => t.length > 5) // Ignore very short fragments
             .join('\n\n');
     }
     
-    return cleanSafeHtml(html);
+    return cleanSafeHtml(html, mainImageUrl);
 }
 
 // Helper to strip tags AND their contents for specific tags like style/script
@@ -120,7 +142,7 @@ export async function fetchNews() {
         // Fetch full content for all items using allSettled for reliability
         const resultsRaw = await Promise.allSettled(initialItems.map(async (item, index) => {
             if (!item.link) {
-                return { ...item, description: getText(item.description) };
+                return { ...item, description: getText(item.description, item.image) };
             }
 
             try {
@@ -142,14 +164,14 @@ export async function fetchNews() {
                     }
                 }
                 
-                if (!bodyHtml) return { ...item, description: getText(item.description) };
+                if (!bodyHtml) return { ...item, description: getText(item.description, item.image) };
 
                 return {
                     ...item,
-                    description: getText(bodyHtml) // Use our improved getText which now handles blocks
+                    description: getText(bodyHtml, item.image) 
                 };
             } catch (e) {
-                return { ...item, description: getText(item.description) };
+                return { ...item, description: getText(item.description, item.image) };
             }
         }));
 

@@ -128,6 +128,15 @@
   color: var(--text-primary);
   margin-bottom: 1rem !important; // Increased spacing between news items/paragraphs
   text-align: justify; // Take full width
+
+  img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
 }
 
 .lead {
