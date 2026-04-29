@@ -3,6 +3,8 @@ import NewsCarousel from '@/components/NewsCarousel/NewsCarousel';
 import styles from './page.module.css';
 import { fetchNews } from '@/lib/news';
 
+export const revalidate = 0;
+
 export default async function Home() {
   let news: any[] = [];
   try {
