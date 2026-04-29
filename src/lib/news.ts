@@ -56,7 +56,8 @@ export async function fetchNews() {
     try {
         const response = await fetch(rssUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' },
-            cache: 'no-store'
+            cache: 'no-store',
+            next: { revalidate: 0 }
         });
         const xmlText = await response.text();
         const root = parse(xmlText, { lowerCaseTagName: true });
@@ -116,17 +117,17 @@ export async function fetchNews() {
             });
         }
 
-        // Fetch full content for the first 5 items using allSettled for reliability
+        // Fetch full content for all items using allSettled for reliability
         const resultsRaw = await Promise.allSettled(initialItems.map(async (item, index) => {
-            // For items beyond config.scraping.maxDetailedItems, or if link is missing, just use cleaned RSS description
-            if (index >= config.scraping.maxDetailedItems || !item.link) {
+            if (!item.link) {
                 return { ...item, description: getText(item.description) };
             }
 
             try {
                 const articleRes = await fetch(item.link, { 
                     headers: { 'User-Agent': 'Mozilla/5.0' },
-                    cache: 'no-store'
+                    cache: 'no-store',
+                    next: { revalidate: 0 }
                 });
                 const html = await articleRes.text();
                 const articleRoot = parse(html);
