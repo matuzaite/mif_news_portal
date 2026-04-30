@@ -109,40 +109,33 @@
 
 .articleBody {
   flex: 1;
-  // Removed fixed height to fill available space
-  overflow-y: scroll; // Explicitly set to scroll for TV browsers
-  -webkit-overflow-scrolling: touch; // Momentum scrolling support
+  overflow-y: scroll; 
+  -webkit-overflow-scrolling: touch; 
   scrollbar-width: none;
-  white-space: pre-line; // Preserve line breaks
-  outline: none; // Remove the default focus ring (black frame)
+  white-space: normal; // Changed from pre-line since we now use HTML tags
+  outline: none; 
 
   &::-webkit-scrollbar {
     display: none;
   }
-}
 
-.paragraph {
-  display: block;
-  font-size: 1.2rem;
-  line-height: 1.6;
-  color: var(--text-primary);
-  margin-bottom: 1rem !important; // Increased spacing between news items/paragraphs
-  text-align: justify; // Take full width
+  p, div, blockquote, ul, ol {
+    display: block;
+    font-size: 1.2rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    margin-bottom: 1rem !important;
+    text-align: justify;
+  }
 
   img {
-    max-width: 100%;
+    max-width: 50%;
     height: auto;
     border-radius: 8px;
-    margin: 1.5rem 0;
+    margin: 1.5rem auto;
     display: block;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
-}
-
-.lead {
-  font-weight: 700;
-  margin-bottom: 2.5rem;
-  font-size: 1.3rem;
 }
 
 .progressContainer {

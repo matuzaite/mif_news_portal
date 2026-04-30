@@ -1,9 +1,8 @@
 import config from '@/config/portal.config.json';
 import { parse } from 'node-html-parser';
 
-// Helper to decode HTML entities and clean text
 // Helper to remove unsafe tags and attributes while keeping formatting
-function cleanSafeHtml(html: string, mainImageUrl?: string): string {
+function cleanSafeHtml(html: string): string {
     if (!html) return "";
     const root = parse(html);
     
@@ -17,12 +16,7 @@ function cleanSafeHtml(html: string, mainImageUrl?: string): string {
             if (src) {
                 try {
                     const absoluteUrl = new URL(src, 'https://mif.vu.lt').href;
-                    if (absoluteUrl === mainImageUrl) {
-                        el.remove();
-                        return; // skip further processing for this element
-                    } else {
-                        el.setAttribute('src', absoluteUrl);
-                    }
+                    el.setAttribute('src', absoluteUrl);
                 } catch (e) {
                     el.remove();
                     return;
@@ -47,29 +41,40 @@ function cleanSafeHtml(html: string, mainImageUrl?: string): string {
 // Helper to decode HTML entities and preserve paragraph breaks + safe formatting
 function getText(html: string, mainImageUrl?: string): string {
     if (!html) return "";
+
     const root = parse(html);
+
+    // 2. Jei turime pagrindinės nuotraukos URL, papildomai pašaliname visas kitas, kurios sutampa pagal pavadinimą
+    if (mainImageUrl) {
+        try {
+            const fileName = mainImageUrl.split('/').pop()?.split('.')[0].split('_')[0];
+            if (fileName && fileName.length > 3) {
+                root.querySelectorAll('img').forEach(img => {
+                    const src = img.getAttribute('src');
+                    if (src && src.includes(fileName)) {
+                        img.remove();
+                    }
+                });
+            }
+        } catch (e) {}
+    }
     
-    // Hard breaks: between P tags, headers, or separate lists
-    const blocks = root.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol');
+    // 3. Imame tik tiesioginius vaikus, kurie yra teksto blokai
+    // Tai patikimiausias būdas išvengti dubliavimosi ir užtikrinti, kad matome visą turinį
+    const blocks = root.childNodes.filter(node => {
+        if (node.nodeType !== 1) return false;
+        const tag = (node as any).tagName?.toUpperCase();
+        return ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'DIV', 'BLOCKQUOTE', 'TABLE', 'IMG', 'FIGURE'].includes(tag);
+    });
+
     if (blocks.length > 0) {
         return blocks
-            .map(el => cleanSafeHtml(el.innerHTML, mainImageUrl))
-            .filter(t => t.length > 5) // Ignore very short fragments
+            .map(node => cleanSafeHtml((node as any).outerHTML))
+            .filter(t => t.trim().length > 5) 
             .join('\n\n');
     }
     
-    return cleanSafeHtml(html, mainImageUrl);
-}
-
-// Helper to strip tags AND their contents for specific tags like style/script
-function cleanBodyHtml(html: string): string {
-    if (!html) return "";
-    const root = parse(html);
-    
-    // Remove scripts and styles
-    root.querySelectorAll('script, style').forEach(el => el.remove());
-    
-    return root.toString();
+    return cleanSafeHtml(root.innerHTML);
 }
 
 export async function fetchNews() {
@@ -140,7 +145,7 @@ export async function fetchNews() {
         }
 
         // Fetch full content for all items using allSettled for reliability
-        const resultsRaw = await Promise.allSettled(initialItems.map(async (item, index) => {
+        const resultsRaw = await Promise.allSettled(initialItems.map(async (item) => {
             if (!item.link) {
                 return { ...item, description: getText(item.description, item.image) };
             }
@@ -159,7 +164,7 @@ export async function fetchNews() {
                 for (const selector of config.scraping.selectors) {
                     const target = articleRoot.querySelector(selector);
                     if (target) {
-                        bodyHtml = cleanBodyHtml(target.innerHTML);
+                        bodyHtml = target.innerHTML;
                         break;
                     }
                 }

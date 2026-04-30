@@ -120,9 +120,6 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
       <div className={styles.newsContainer}>
         {items.map((item, idx) => {
           const isActive = idx === currentIndex;
-          const paragraphs: string[] = item.description
-            ? item.description.split('\n\n').filter((p: string) => p.trim().length > 0)
-            : [];
 
           return (
             <div 
@@ -158,7 +155,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
               {/* Right Column: Date and Clean Paragraphs */}
               <div className={styles.rightColumn}>
                 <div className={styles.dateLabel}>
-                  {item.date}
+                  {item.category} | {item.date}
                 </div>
 
                 <div 
@@ -168,13 +165,9 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
                   onMouseLeave={() => setIsPaused(false)}
                   tabIndex={0}
                 >
-                  {paragraphs.map((p: string, pIdx: number) => (
-                    <div
-                      key={pIdx}
-                      className={`${styles.paragraph} ${pIdx === 0 && paragraphs.length > 1 ? styles.lead : styles.normal}`}
-                      dangerouslySetInnerHTML={{ __html: p }}
-                    />
-                  ))}
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: item.description }}
+                  />
                 </div>
               </div>
             </div>
