@@ -48,7 +48,7 @@ function getText(html: string, mainImageUrl?: string): string {
     if (mainImageUrl) {
         try {
             const fileName = mainImageUrl.split('/').pop()?.split('.')[0].split('_')[0];
-            if (fileName && fileName.length > 3) {
+            if (fileName && fileName.length > 2) {
                 root.querySelectorAll('img').forEach(img => {
                     const src = img.getAttribute('src');
                     if (src && src.includes(fileName)) {
