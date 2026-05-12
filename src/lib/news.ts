@@ -1,80 +1,100 @@
 import config from '@/config/portal.config.json';
 import { parse } from 'node-html-parser';
 
-// Helper to remove unsafe tags and attributes while keeping formatting
-function cleanSafeHtml(html: string): string {
+// 1. Išmanus dublikatų atpažinimas (ignoruojant dydžių galūnes, pvz., _380, -150x150, arba tiesiog skaičius gale)
+function isDuplicateImage(imgSrc: string, mainImgUrl: string): boolean {
+    if (!imgSrc || !mainImgUrl) return false;
+    
+    const getCoreName = (url: string) => {
+        // Pašaliname double slashes ir kitus URL nesutapimus
+        const normalizedUrl = url.replace(/([^:])\/\//g, '$1/');
+        const fileWithExt = normalizedUrl.split('/').pop()?.split('?')[0].toLowerCase() || '';
+        const noExt = fileWithExt.substring(0, fileWithExt.lastIndexOf('.')) || fileWithExt;
+        // Pašaliname galūnes: .380, _380, -380, arba tiesiog skaičius gale (pvz. pasauli380 -> pasauli)
+        return noExt.replace(/[._-]?\d+x\d+$/, '').replace(/[._-]?\d+$/, '').replace(/[._-](large|small|thumb|medium)$/, '');
+    };
+
+    const coreSrc = getCoreName(imgSrc);
+    const coreMain = getCoreName(mainImgUrl);
+
+    return (coreSrc === coreMain || coreSrc.includes(coreMain) || coreMain.includes(coreSrc)) && coreSrc.length > 3;
+}
+
+// 2. Saugus HTML valymas: palieka galerijas, bet ištrina pagrindinę nuotrauką
+function cleanSafeHtml(html: string, mainImageUrl: string): string {
     if (!html) return "";
     const root = parse(html);
     
-    // Remove scripts, styles and other unsafe objects
+    // Ištriname TIK kenkėjiškus tagus, bet PALIEKAME img
     root.querySelectorAll('script, style, iframe, canvas, svg').forEach(el => el.remove());
     
-    // Cleanup all attributes except safe ones
-    root.querySelectorAll('*').forEach(el => {
-        if (el.tagName.toLowerCase() === 'img') {
-            const src = el.getAttribute('src');
-            if (src) {
+    // Filtruojame nuotraukas
+    const allImages = root.querySelectorAll('img');
+    allImages.forEach((img, index) => {
+        const src = img.getAttribute('src') || '';
+        const dataSrc = img.getAttribute('data-src') || '';
+        const srcset = img.getAttribute('srcset') || '';
+        const allSources = `${src} ${dataSrc} ${srcset}`.toLowerCase();
+        
+        // TAISYKLĖ: 
+        // 1. Pirma nuotrauka straipsnyje beveik visada yra pagrindinė - triname ją besąlygiškai.
+        // 2. Kitas nuotraukas tikriname pagal pavadinimą.
+        if (index === 0 || !src || isDuplicateImage(allSources, mainImageUrl)) {
+            img.remove();
+        } else {
+            // Jei tai galerijos nuotrauka - paliekame ir sutvarkome atributus
+            const finalSrc = dataSrc || src;
+            if (finalSrc) {
                 try {
-                    const absoluteUrl = new URL(src, 'https://mif.vu.lt').href;
-                    el.setAttribute('src', absoluteUrl);
+                    const absoluteUrl = new URL(finalSrc, 'https://mif.vu.lt').href;
+                    img.setAttribute('src', absoluteUrl);
                 } catch (e) {
-                    el.remove();
-                    return;
+                    img.setAttribute('src', finalSrc);
                 }
-            } else {
-                el.remove();
-                return;
             }
+            
+            const allowedAttr = ['src', 'alt'];
+            Object.keys(img.attributes).forEach(attr => {
+                if (!allowedAttr.includes(attr)) img.removeAttribute(attr);
+            });
         }
+    });
 
-        const attributes = Object.keys(el.attributes);
-        attributes.forEach(attr => {
-            // Keep href for links, src/alt/width/height for images
-            const safeAttrs = ['href', 'src', 'alt', 'width', 'height'];
-            if (!safeAttrs.includes(attr)) el.removeAttribute(attr);
-        });
+    // Išvalome atributus visiems kitiems elementams
+    root.querySelectorAll('*').forEach(el => {
+        if (el.tagName.toLowerCase() !== 'img') {
+            const attributes = Object.keys(el.attributes);
+            attributes.forEach(attr => {
+                if (attr !== 'href') el.removeAttribute(attr);
+            });
+        }
     });
     
     return root.innerHTML.trim();
 }
 
-// Helper to decode HTML entities and preserve paragraph breaks + safe formatting
-function getText(html: string, mainImageUrl?: string): string {
+// 3. Teksto ir likusių nuotraukų blokų ištraukimas
+function getText(html: string, mainImageUrl: string): string {
     if (!html) return "";
-
-    const root = parse(html);
-
-    // 2. Jei turime pagrindinės nuotraukos URL, papildomai pašaliname visas kitas, kurios sutampa pagal pavadinimą
-    if (mainImageUrl) {
-        try {
-            const fileName = mainImageUrl.split('/').pop()?.split('.')[0].split('_')[0];
-            if (fileName && fileName.length > 2) {
-                root.querySelectorAll('img').forEach(img => {
-                    const src = img.getAttribute('src');
-                    if (src && src.includes(fileName)) {
-                        img.remove();
-                    }
-                });
-            }
-        } catch (e) {}
-    }
     
-    // 3. Imame tik tiesioginius vaikus, kurie yra teksto blokai
-    // Tai patikimiausias būdas išvengti dubliavimosi ir užtikrinti, kad matome visą turinį
-    const blocks = root.childNodes.filter(node => {
-        if (node.nodeType !== 1) return false;
-        const tag = (node as any).tagName?.toUpperCase();
-        return ['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'DIV', 'BLOCKQUOTE', 'TABLE', 'IMG', 'FIGURE'].includes(tag);
-    });
-
+    // Išvalome HTML ir pašaliname dublikatą
+    const cleanedHtml = cleanSafeHtml(html, mainImageUrl);
+    const root = parse(cleanedHtml);
+    
+    // Ieškome blokų (pridėtas 'figure' ir '.gallery', kad galerijos nedingtų)
+    const blocks = root.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, figure, .gallery, table, blockquote');
+    
     if (blocks.length > 0) {
         return blocks
-            .map(node => cleanSafeHtml((node as any).outerHTML))
-            .filter(t => t.trim().length > 5) 
+            .map(el => el.outerHTML) 
+            .filter(t => {
+                const text = t.replace(/<[^>]*>?/gm, '').trim();
+                return text.length > 0 || t.includes('<img');
+            }) 
             .join('\n\n');
     }
     
-    return cleanSafeHtml(root.innerHTML);
+    return cleanedHtml;
 }
 
 export async function fetchNews() {
@@ -135,7 +155,7 @@ export async function fetchNews() {
 
             initialItems.push({
                 id: link.trim() || Math.random().toString(),
-                title: getText(title),
+                title: getText(title, ""),
                 link: link.trim(),
                 image,
                 date,

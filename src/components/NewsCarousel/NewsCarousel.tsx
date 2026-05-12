@@ -134,7 +134,6 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
                     alt={item.title}
                     fill
                     className={styles.mainImage}
-                    loading={idx === 0 ? "eager" : "lazy"}
                     priority={idx === 0}
                     unoptimized={item.image.includes('images.unsplash.com')}
                     sizes="(max-width: 1200px) 70vw, 40vw"
