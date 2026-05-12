@@ -1,115 +1,78 @@
 import config from '@/config/portal.config.json';
 import { parse } from 'node-html-parser';
 
-// 1. Išmanus dublikatų atpažinimas (Labai tikslus pavadinimų ištraukėjas)
-function isDuplicateImage(imgSrc: string, mainImgUrl: string): boolean {
-    if (!imgSrc || !mainImgUrl) return false;
-    
-    const getCoreName = (url: string) => {
-        try { url = decodeURIComponent(url); } catch(e) {}
-        const normalizedUrl = url.replace(/([^:])\/\//g, '$1/');
-        const fileWithExt = normalizedUrl.split('/').pop()?.split('?')[0].toLowerCase() || '';
-        const noExt = fileWithExt.substring(0, fileWithExt.lastIndexOf('.')) || fileWithExt;
-        // Tiksliai pašaliname tik TVS pridedamas galūnes, o ne bet kokius skaičius
-        return noExt.replace(/([._-]?\d+x\d+|[._-]?\d+|[._-](large|small|thumb|medium))$/, '');
+// Funkcija, kuri padeda atpažinti ar nuotraukos priklauso tam pačiam "šaltiniui"
+// Joomla dažnai sukuria skirtingus failus tam pačiam vaizdui (pvz. img_abc123.jpg ir img_xyz789.jpg)
+function isSameVisual(url1: string, url2: string): boolean {
+    if (!url1 || !url2) return false;
+    const getBase = (u: string) => {
+        const parts = u.split('/').pop()?.split('?')[0].split('.')[0] || '';
+        // Nulupame tipines galūnes, bet paliekame esmę
+        return parts.toLowerCase().replace(/[-_](thumb|small|medium|large|150x150|380x\d+)$/, '').split('_')[0];
     };
-
-    const coreSrc = getCoreName(imgSrc);
-    const coreMain = getCoreName(mainImgUrl);
-
-    // Reikalaujame tikslaus pavadinimo (be galūnių) atitikimo
-    return coreSrc === coreMain && coreSrc.length > 3;
+    const b1 = getBase(url1);
+    const b2 = getBase(url2);
+    return b1 === b2 && b1.length > 3;
 }
 
-// 2. Saugus HTML valymas: palieka galerijas ir trina TIK tikrus dublikatus
-function cleanSafeHtml(html: string, mainImageUrl: string): string {
-    if (!html) return "";
+function processContent(html: string, fallbackImg: string) {
+    if (!html) return { cleanedHtml: "", mainImage: fallbackImg };
     const root = parse(html);
-    
-    // Ištriname kenkėjiškus tagus
+
+    // 1. Išvalome šiukšles
     root.querySelectorAll('script, style, iframe, canvas, svg').forEach(el => el.remove());
-    
-    // Filtruojame nuotraukas
-    const allImages = root.querySelectorAll('img');
-    allImages.forEach((img) => {
-        const src = img.getAttribute('src') || '';
-        const dataSrc = img.getAttribute('data-src') || '';
-        const srcset = img.getAttribute('srcset') || '';
-        
-        let isDup = false;
-        
-        // Tikriname KIEKVIENĄ atributą atskirai (tai ištaiso tų dviejų paskutinių straipsnių klaidą)
-        if (src && isDuplicateImage(src, mainImageUrl)) isDup = true;
-        if (dataSrc && isDuplicateImage(dataSrc, mainImageUrl)) isDup = true;
-        
-        // Jei yra srcset, jis gali telkti kelis url atskirtus kableliais
-        if (srcset) {
-            const srcsetUrls = srcset.split(',').map(s => s.trim().split(' ')[0]);
-            if (srcsetUrls.some(u => isDuplicateImage(u, mainImageUrl))) {
-                isDup = true;
+
+    let mainImage = fallbackImg;
+    const allImgs = root.querySelectorAll('img');
+
+    if (allImgs.length > 0) {
+        // Ieškome geriausios nuotraukos (ne thumbnailo) kairiajam ekranui
+        let bestImgTag = allImgs[0];
+        for (const img of allImgs) {
+            const s = img.getAttribute('src') || '';
+            if (!s.includes('thumb') && !s.includes('150x')) {
+                bestImgTag = img;
+                break;
             }
         }
-        
-        if (isDup) {
-            // Tai tikras dublikatas – naikiname jį ir jo rėmelius
-            let parent = img.parentNode;
-            if (parent && ['picture', 'figure'].includes(parent.tagName.toLowerCase())) {
-                parent.remove();
-            } else {
-                img.remove();
-            }
-        } else {
-            // TAI YRA GALERIJOS NUOTRAUKA! Paliekame ją ramybėje ir suformatuojame, kad veiktų TV.
-            const finalSrc = dataSrc || src;
-            if (finalSrc) {
-                try {
-                    const absoluteUrl = new URL(finalSrc, 'https://mif.vu.lt').href;
-                    img.setAttribute('src', absoluteUrl);
-                } catch (e) {
-                    img.setAttribute('src', finalSrc);
+
+        const rawSrc = bestImgTag.getAttribute('src') || bestImgTag.getAttribute('data-src') || '';
+        if (rawSrc) {
+            try { mainImage = new URL(rawSrc, 'https://mif.vu.lt').href; } 
+            catch(e) { mainImage = rawSrc; }
+        }
+
+        // 2. DUBLIKATŲ NAIKINIMAS: Ištriname VISAS nuotraukas iš teksto, 
+        // kurios vizualiai sutampa su pagrindine (išsprendžia "triple clones" problemą)
+        root.querySelectorAll('img').forEach(img => {
+            const s = img.getAttribute('src') || img.getAttribute('data-src') || '';
+            if (isSameVisual(s, mainImage) || s === rawSrc) {
+                // Sunaikiname visą rėmą (picture/figure/p), kad neliktų skylių
+                let target = img as any;
+                if (target.parentNode?.tagName?.toLowerCase() === 'picture') target = target.parentNode;
+                if (target.parentNode?.tagName?.toLowerCase() === 'figure') target = target.parentNode;
+                if (target.parentNode?.tagName?.toLowerCase() === 'a') target = target.parentNode;
+                
+                // Jei tėvinis elementas yra tuščias (tik ši foto), triname jį visą
+                const parent = target.parentNode;
+                if (parent && parent.textContent.trim().length === 0) {
+                    parent.remove();
+                } else {
+                    target.remove();
                 }
             }
-            
-            const allowedAttr = ['src', 'alt'];
-            Object.keys(img.attributes).forEach(attr => {
-                if (!allowedAttr.includes(attr)) img.removeAttribute(attr);
-            });
-        }
-    });
-
-    // Išvalome atributus visiems kitiems elementams
-    root.querySelectorAll('*').forEach(el => {
-        if (el.tagName.toLowerCase() !== 'img') {
-            const attributes = Object.keys(el.attributes);
-            attributes.forEach(attr => {
-                if (attr !== 'href') el.removeAttribute(attr);
-            });
-        }
-    });
-    
-    return root.innerHTML.trim();
-}
-
-// 3. Teksto ištraukimas
-function getText(html: string, mainImageUrl: string): string {
-    if (!html) return "";
-    
-    const cleanedHtml = cleanSafeHtml(html, mainImageUrl);
-    const root = parse(cleanedHtml);
-    
-    const blocks = root.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, figure, .gallery, table, blockquote');
-    
-    if (blocks.length > 0) {
-        return blocks
-            .map(el => el.outerHTML) 
-            .filter(t => {
-                const text = t.replace(/<[^>]*>?/gm, '').trim();
-                return text.length > 0 || t.includes('<img');
-            }) 
-            .join('\n\n');
+        });
     }
-    
-    return cleanedHtml;
+
+    // Sutvarkome likusias galerijos nuotraukas
+    root.querySelectorAll('img').forEach(img => {
+        const src = img.getAttribute('src') || img.getAttribute('data-src');
+        if (src && !src.startsWith('http')) {
+            try { img.setAttribute('src', new URL(src, 'https://mif.vu.lt').href); } catch(e) {}
+        }
+    });
+
+    return { cleanedHtml: root.innerHTML.trim(), mainImage };
 }
 
 export async function fetchNews() {
@@ -123,113 +86,50 @@ export async function fetchNews() {
         });
         const xmlText = await response.text();
         const root = parse(xmlText, { lowerCaseTagName: true });
-        
         const items = root.querySelectorAll('item');
         const initialItems = [];
 
         for (let i = 0; i < Math.min(items.length, config.scraping.maxItems); i++) {
             const item = items[i];
-            const title = item.querySelector('title')?.text || "";
             const link = item.querySelector('link')?.text || "";
-            
-            let descriptionFull = item.querySelector('description')?.innerHTML || "";
-            if (descriptionFull.includes('<![CDATA[')) {
-                descriptionFull = descriptionFull.split('<![CDATA[').join('').split(']]>').join('');
-            }
-
-            const descRoot = parse(descriptionFull);
-            const imgTags = descRoot.querySelectorAll('img');
-            let image = "";
-
-            for (const img of imgTags) {
-                const src = img.getAttribute('src');
-                if (!src) continue;
-                
-                // Atmetame thumbnail'us renkantis pagrindinę nuotrauką iš RSS
-                if (src.toLowerCase().includes('thumb') || src.match(/[._-]?150x\d+/)) {
-                    continue;
-                }
-
-                try {
-                    const absoluteUrl = new URL(src, 'https://mif.vu.lt').href;
-                    if (/\.(jpg|jpeg|png|webp|gif|svg)$/i.test(absoluteUrl)) {
-                        image = absoluteUrl;
-                        break;
-                    }
-                } catch (e) {
-                    continue;
-                }
-            }
-            
-            if (!image) {
-                image = config.ui.placeholderImage;
-            }
-
+            const title = item.querySelector('title')?.text || "";
             const pubDate = item.querySelector('pubDate')?.text || "";
             const date = new Date(pubDate && !isNaN(Date.parse(pubDate)) ? pubDate : Date.now()).toLocaleDateString('lt-LT');
 
             initialItems.push({
                 id: link.trim() || Math.random().toString(),
-                title: getText(title, ""),
+                title: title.replace(/<[^>]*>?/gm, '').trim(),
                 link: link.trim(),
-                image,
                 date,
                 category: 'Naujiena',
-                description: descriptionFull
+                description: item.querySelector('description')?.innerHTML || ""
             });
         }
 
         const resultsRaw = await Promise.allSettled(initialItems.map(async (item) => {
-            if (!item.link) {
-                return { ...item, description: getText(item.description, item.image) };
-            }
-
             try {
-                const articleRes = await fetch(item.link, { 
-                    headers: { 'User-Agent': 'Mozilla/5.0' },
-                    cache: 'no-store',
-                    next: { revalidate: 0 }
-                });
+                const articleRes = await fetch(item.link, { headers: { 'User-Agent': 'Mozilla/5.0' }, cache: 'no-store' });
                 const html = await articleRes.text();
                 const articleRoot = parse(html);
 
                 let bodyHtml = "";
                 for (const selector of config.scraping.selectors) {
                     const target = articleRoot.querySelector(selector);
-                    if (target) {
-                        bodyHtml = target.innerHTML;
-                        break;
-                    }
+                    if (target) { bodyHtml = target.innerHTML; break; }
                 }
 
-                // Jei RSS buvo tik placeholderis, pasiimame pirmą gerą nuotrauką iš straipsnio vidaus
-                let finalImage = item.image;
-                if (finalImage === config.ui.placeholderImage) {
-                    const bodyImages = articleRoot.querySelectorAll('img');
-                    for(const img of bodyImages) {
-                        const src = img.getAttribute('src') || img.getAttribute('data-src');
-                        if(src && !src.toLowerCase().includes('thumb') && !src.match(/[._-]?150x\d+/)) {
-                            finalImage = new URL(src, 'https://mif.vu.lt').href;
-                            break;
-                        }
-                    }
-                }
-                
-                if (!bodyHtml) return { ...item, image: finalImage, description: getText(item.description, finalImage) };
+                // Jei straipsnyje nėra turinio, naudojame RSS aprašymą
+                const contentToProcess = bodyHtml || item.description;
+                const processed = processContent(contentToProcess, config.ui.placeholderImage);
 
-                return {
-                    ...item,
-                    image: finalImage,
-                    description: getText(bodyHtml, finalImage) 
-                };
+                return { ...item, image: processed.mainImage, description: processed.cleanedHtml };
             } catch (e) {
-                return { ...item, description: getText(item.description, item.image) };
+                const processed = processContent(item.description, config.ui.placeholderImage);
+                return { ...item, image: processed.mainImage, description: processed.cleanedHtml };
             }
         }));
 
-        return resultsRaw.map(res => 
-            res.status === 'fulfilled' ? res.value : null
-        ).filter(Boolean);
+        return resultsRaw.map(res => res.status === 'fulfilled' ? res.value : null).filter(Boolean);
     } catch (error) {
         return [];
     }
