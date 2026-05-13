@@ -144,6 +144,7 @@ export default function NewsCarousel({ initialItems }: NewsCarouselProps) {
                       }
                     }}
                   />
+                  <div className={styles.imageGradient} />
                 </div>
 
                 <div className={styles.headlineContainer}>

@@ -45,12 +45,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   border-right: 1px solid var(--border-color);
   background: white;
   position: relative;
   overflow: hidden;
   padding: 60px;
+  padding-top: 10%;
 }
 
 // Removed backgroundImageContainer and backgroundImageBlur
@@ -60,11 +61,23 @@
   width: 85%;
   aspect-ratio: 16 / 10;
   z-index: 2;
-  border-radius: 12px;
+  border-radius: 7px;
   overflow: hidden;
   border: 1px solid var(--border-color);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
   margin-bottom: 20px;
+}
+
+.imageGradient {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 100%);
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 0 0 7px 7px;
 }
 
 .mainImage {
@@ -78,53 +91,60 @@
   width: 85%;
   display: flex;
   align-items: flex-start;
-  padding: 20px 0;
+  padding: 24px 0;
   z-index: 3;
 }
 
 .headline {
   font-size: 2.5rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text-primary);
-  line-height: 1.2;
-  margin: 0;
+  line-height: 1.25;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
 }
 
 .rightColumn {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 60px 60px 0 60px; // Remove bottom padding to let text reach bottom
+  padding: 60px 72px 0 72px; // Generous horizontal padding for breathing room
   overflow: hidden;
 }
 
 .dateLabel {
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-size: 0.9rem;
+  font-weight: 700;
   color: var(--accent-primary);
-  margin-bottom: 30px;
+  margin-bottom: 1.5rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .articleBody {
   flex: 1;
-  overflow-y: scroll; 
-  -webkit-overflow-scrolling: touch; 
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   white-space: normal; // Changed from pre-line since we now use HTML tags
-  outline: none; 
+  outline: none;
 
   &::-webkit-scrollbar {
     display: none;
   }
 
-  p, div, blockquote, ul, ol {
+  p,
+  div,
+  blockquote,
+  ul,
+  ol {
     display: block;
-    font-size: 1.2rem;
-    line-height: 1.6;
-    color: var(--text-primary);
-    margin-bottom: 1rem !important;
+    font-size: 1.15rem;
+    line-height: 1.7;
+    color: #333333;
+    margin-bottom: 1.15rem !important;
     text-align: justify;
   }
 
